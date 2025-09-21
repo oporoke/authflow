@@ -1,7 +1,20 @@
 import Link from 'next/link';
 import type { Session } from 'next-auth';
-import { SignInButton, UserNav } from '@/components/auth-components';
 import Logo from '@/components/logo';
+import dynamic from 'next/dynamic';
+import { Button } from '../ui/button';
+import { Skeleton } from '../ui/skeleton';
+
+const UserNav = dynamic(() => import('@/components/auth-components').then(mod => mod.UserNav), {
+  loading: () => <Skeleton className="h-9 w-9 rounded-full" />,
+  ssr: false,
+});
+
+const SignInButton = dynamic(() => import('@/components/auth-components').then(mod => mod.SignInButton), {
+  loading: () => <Button disabled>Sign In</Button>,
+  ssr: false,
+});
+
 
 export default function Header({ session }: { session: Session | null }) {
   return (

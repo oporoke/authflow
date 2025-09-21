@@ -3,7 +3,6 @@
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { AuthError } from 'next-auth';
-import { REDIRECT_ERROR_CODE } from 'next/dist/client/components/redirect-constants';
 
 import {
   SignupSchema,
@@ -63,7 +62,7 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
 
     return { success: true, message: 'Signup successful! Redirecting...' };
   } catch (error: any) {
-    if (error.digest?.startsWith(REDIRECT_ERROR_CODE)) {
+    if (error.digest?.includes('NEXT_REDIRECT')) {
       throw error;
     }
     console.error('Signup error:', error);
@@ -88,7 +87,7 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
                     return { message: 'An error occurred.'}
             }
         }
-        if ((error as any).digest?.startsWith(REDIRECT_ERROR_CODE)) {
+        if ((error as any).digest?.includes('NEXT_REDIRECT')) {
           throw error;
         }
         throw error;

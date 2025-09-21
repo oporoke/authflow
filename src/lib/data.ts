@@ -70,46 +70,6 @@ export const deletePasswordResetToken = async (id: string) => {
   });
 };
 
-
-// 2FA TOKEN FUNCTIONS
-export const getTwoFactorTokenByToken = async (token: string) => {
-  try {
-    return await db.twoFactorToken.findUnique({ where: { token } });
-  } catch {
-    return null;
-  }
-};
-
-export const getTwoFactorTokenByEmail = async (email: string) => {
-    try {
-        return await db.twoFactorToken.findFirst({ where: { email } });
-    } catch {
-        return null;
-    }
-}
-
-export const createTwoFactorToken = async (email: string) => {
-  const token = crypto.randomInt(100_000, 1_000_000).toString();
-  const expires = new Date(new Date().getTime() + 5 * 60 * 1000); // 5 minutes
-
-  const existingToken = await getTwoFactorTokenByEmail(email);
-
-  if (existingToken) {
-    await db.twoFactorToken.delete({ where: { id: existingToken.id } });
-  }
-
-  const twoFactorToken = await db.twoFactorToken.create({
-    data: { email, token, expires },
-  });
-
-  return twoFactorToken;
-};
-
-export const deleteTwoFactorToken = async (id: string) => {
-    await db.twoFactorToken.delete({ where: { id } });
-}
-
-
 // 2FA CONFIRMATION FUNCTIONS
 export const getTwoFactorConfirmationByUserId = async (userId: string) => {
     try {

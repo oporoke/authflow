@@ -21,17 +21,13 @@ import {
   deletePasswordResetToken,
   updateUser,
   createUser,
-  getTwoFactorTokenByToken,
-  deleteTwoFactorToken,
-  createTwoFactorToken,
   getTwoFactorConfirmationByUserId,
   deleteTwoFactorConfirmation,
   createTwoFactorConfirmation,
   getUserById,
-  getTwoFactorTokenByEmail,
 } from '@/lib/data';
 import { signIn } from '@/lib/auth';
-import { sendPasswordResetEmail, sendWelcomeEmail, sendTwoFactorTokenEmail } from '@/lib/email';
+import { sendPasswordResetEmail, sendWelcomeEmail } from '@/lib/email';
 import { DEFAULT_LOGIN_REDIRECT } from '@/lib/constants';
 
 type FormState = {
@@ -57,7 +53,7 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
   const hashedPassword = await bcrypt.hash(password, 12);
 
   try {
-    await createUser({
+    const user = await createUser({
       email,
       username,
       password: hashedPassword,
@@ -71,6 +67,7 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
       redirectTo: DEFAULT_LOGIN_REDIRECT,
     });
 
+    // This return is for type consistency but will likely not be reached due to redirect
     return { success: true, message: 'Signup successful! Redirecting...' };
   } catch (error: any) {
     if (error.digest?.includes('NEXT_REDIRECT')) {
@@ -82,59 +79,53 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
 }
 
 export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: string | null): Promise<FormState & { twoFactor?: boolean }> {
-  const validatedFields = LoginSchema.safeParse(values);
+    const validatedFields = LoginSchema.safeParse(values);
 
-  if (!validatedFields.success) {
-    return { message: "Invalid fields." };
-  }
-
-  const { email, password, code } = validatedFields.data;
-
-  const existingUser = await getUserByEmail(email);
-
-  if (!existingUser || !existingUser.email || !existingUser.password) {
-    return { message: "Invalid email or password." };
-  }
-
-  if (existingUser.lockedUntil && new Date() < new Date(existingUser.lockedUntil)) {
-    return { message: `Account locked. Try again after ${new Date(existingUser.lockedUntil).toLocaleTimeString()}.` };
-  }
-
-  if (existingUser.twoFactorEnabled && existingUser.email) {
-    if (code) {
-      const twoFactorToken = await getTwoFactorTokenByEmail(existingUser.email);
-
-      if (!twoFactorToken || twoFactorToken.token !== code) {
-        return { message: 'Invalid 2FA code.' };
-      }
-
-      if (new Date(twoFactorToken.expires) < new Date()) {
-        await createTwoFactorToken(existingUser.email);
-        await sendTwoFactorTokenEmail(existingUser.email, (await getTwoFactorTokenByEmail(existingUser.email))!.token);
-        return { message: '2FA code has expired. A new one has been sent.' };
-      }
-      
-      await deleteTwoFactorToken(twoFactorToken.id);
-
-      const existingConfirmation = await getTwoFactorConfirmationByUserId(existingUser.id);
-
-      if (existingConfirmation) {
-        await deleteTwoFactorConfirmation(existingConfirmation.userId);
-      }
-      await createTwoFactorConfirmation(existingUser.id);
-    } else {
-        if (!password) {
-            return { message: "Password is required." };
-        }
-        const passwordsMatch = await bcrypt.compare(password, existingUser.password);
-        if (!passwordsMatch) {
-            return { message: "Invalid email or password." };
-        }
-      const twoFactorToken = await createTwoFactorToken(existingUser.email);
-      await sendTwoFactorTokenEmail(twoFactorToken.email, twoFactorToken.token);
-      return { twoFactor: true, message: "2FA code sent to your email." }
+    if (!validatedFields.success) {
+      return { message: 'Invalid fields.' };
     }
-  }
+  
+    const { email, password, code } = validatedFields.data;
+  
+    const existingUser = await getUserByEmail(email);
+  
+    if (!existingUser || !existingUser.email || !existingUser.password) {
+      return { message: 'Invalid email or password.' };
+    }
+  
+    if (existingUser.lockedUntil && new Date() < new Date(existingUser.lockedUntil)) {
+      return { message: `Account locked. Try again after ${new Date(existingUser.lockedUntil).toLocaleTimeString()}.` };
+    }
+
+    if (existingUser.twoFactorEnabled && existingUser.twoFactorSecret) {
+        if (code) {
+          const isValid = authenticator.verify({ token: code, secret: existingUser.twoFactorSecret });
+  
+          if (!isValid) {
+            return { message: 'Invalid 2FA code.' };
+          }
+    
+          const existingConfirmation = await getTwoFactorConfirmationByUserId(existingUser.id);
+    
+          if (existingConfirmation) {
+            await deleteTwoFactorConfirmation(existingConfirmation.userId);
+          }
+          await createTwoFactorConfirmation(existingUser.id);
+
+        } else {
+            if (!password) {
+                return { message: 'Password is required.' };
+            }
+            const passwordsMatch = await bcrypt.compare(password, existingUser.password);
+            if (passwordsMatch) {
+              return { twoFactor: true, message: '2FA code required.' };
+            } else {
+              // Handle failed login attempt
+              return { message: 'Invalid email or password.' };
+            }
+        }
+    }
+
 
   try {
       await signIn('credentials', {
@@ -142,7 +133,7 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
           password,
           redirectTo: callbackUrl || DEFAULT_LOGIN_REDIRECT,
       });
-      return { success: true, message: "Logged in successfully!" }
+      return { success: true, message: 'Logged in successfully!' }
   } catch(error) {
       if (error instanceof AuthError) {
           switch(error.type) {

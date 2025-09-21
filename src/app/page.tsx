@@ -2,8 +2,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, ShieldCheck, BrainCircuit } from 'lucide-react';
 import Link from 'next/link';
+import { auth } from '@/lib/auth';
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] p-4 sm:p-6 md:p-8">
       <div className="text-center max-w-4xl mx-auto">
@@ -15,12 +18,20 @@ export default function Home() {
           Sign up, log in, and manage your profile with ease.
         </p>
         <div className="mt-8 flex flex-wrap justify-center gap-4">
-          <Button asChild size="lg">
-            <Link href="/signup">Get Started for Free</Link>
-          </Button>
-          <Button asChild size="lg" variant="secondary">
-            <Link href="/login">Already have an account?</Link>
-          </Button>
+          {session?.user ? (
+            <Button asChild size="lg">
+                <Link href="/dashboard">Go to Dashboard</Link>
+            </Button>
+          ) : (
+            <>
+              <Button asChild size="lg">
+                <Link href="/signup">Get Started for Free</Link>
+              </Button>
+              <Button asChild size="lg" variant="secondary">
+                <Link href="/login">Already have an account?</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 

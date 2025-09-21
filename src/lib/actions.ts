@@ -9,6 +9,7 @@ import {
   ResetPasswordSchema,
   ForgotPasswordSchema,
   ProfileSchema,
+  LoginSchema,
 } from '@/lib/validations';
 import {
   getUserByEmail,
@@ -66,7 +67,7 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
   }
 }
 
-export async function login(values: z.infer<typeof z.object({email: z.string().email(), password: z.string()})>, callbackUrl?: string | null): Promise<FormState> {
+export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: string | null): Promise<FormState> {
     try {
         await signIn('credentials', {
             email: values.email,

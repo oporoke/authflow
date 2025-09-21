@@ -25,7 +25,12 @@ export function SignInButton() {
 
 export function UserNav({ session }: { session: Session }) {
   const user = session.user;
-  const userInitial = user?.username?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase();
+
+  if (!user) {
+    return null;
+  }
+  
+  const userInitial = user.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase();
 
   return (
     <DropdownMenu>

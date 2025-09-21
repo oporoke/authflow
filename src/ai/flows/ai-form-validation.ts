@@ -44,9 +44,9 @@ const aiFormValidationPrompt = ai.definePrompt({
   prompt: `You are an AI-powered form validation assistant. Your task is to analyze the provided form configuration and provide suggestions for improvement, focusing on user experience, localization, and accessibility.
 
 Form Configuration:
-```json
+\`\`\`
 {{{formConfiguration}}}
-```
+\`\`\`
 
 User Context (optional):
 {{{userContext}}}

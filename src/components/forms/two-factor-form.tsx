@@ -3,10 +3,9 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
-import { LoginSchema } from '@/lib/validations';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -21,7 +20,6 @@ import { useToast } from '@/hooks/use-toast';
 import { login } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
 
-// A simplified schema for this form
 const TwoFactorCodeSchema = z.object({
   code: z.string().length(6, { message: "Your one-time code must be 6 characters." }),
 });
@@ -49,9 +47,7 @@ export function TwoFactorForm() {
 
         const loginValues = {
             email,
-            // Password is not needed for the 2FA check, but the underlying action expects it.
-            // We can pass a dummy value because the action logic will prioritize the 2FA code check.
-            password: 'dummy-password-for-2fa-validation', 
+            password: '', // Password is not needed here
             code: values.code
         }
 

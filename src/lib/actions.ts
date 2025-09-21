@@ -28,6 +28,7 @@ import {
   deleteTwoFactorConfirmation,
   createTwoFactorConfirmation,
   getUserById,
+  getTwoFactorTokenByEmail,
 } from '@/lib/data';
 import { signIn } from '@/lib/auth';
 import { sendPasswordResetEmail, sendWelcomeEmail, sendTwoFactorTokenEmail } from '@/lib/email';
@@ -101,13 +102,15 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
 
   if (existingUser.twoFactorEnabled && existingUser.email) {
     if (code) {
-      const twoFactorToken = await getTwoFactorTokenByToken(code);
+      const twoFactorToken = await getTwoFactorTokenByEmail(existingUser.email);
+
       if (!twoFactorToken || twoFactorToken.token !== code) {
         return { message: 'Invalid 2FA code.' };
       }
 
       if (new Date(twoFactorToken.expires) < new Date()) {
-        return { message: '2FA code has expired.' };
+        await createTwoFactorToken(existingUser.email);
+        return { message: '2FA code has expired. A new one has been sent.' };
       }
       
       await deleteTwoFactorToken(twoFactorToken.id);
@@ -118,8 +121,11 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
         await deleteTwoFactorConfirmation(existingConfirmation.userId);
       }
       await createTwoFactorConfirmation(existingUser.id);
-
     } else {
+        const passwordsMatch = await bcrypt.compare(password, existingUser.password);
+        if (!passwordsMatch) {
+            return { message: "Invalid email or password." };
+        }
       const twoFactorToken = await createTwoFactorToken(existingUser.email);
       await sendTwoFactorTokenEmail(twoFactorToken.email, twoFactorToken.token);
       return { twoFactor: true, message: "2FA code sent to your email." }
@@ -145,7 +151,7 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
       if ((error as any).digest?.includes('NEXT_REDIRECT')) {
         throw error;
       }
-      throw error;
+      return { message: 'An unexpected error occurred.' };
   }
 }
 
@@ -166,7 +172,7 @@ export async function forgotPassword(values: z.infer<typeof ForgotPasswordSchema
 
   const passwordResetToken = await createPasswordResetToken(existingUser.id);
   await sendPasswordResetEmail(
-    existingUser.email,
+    existingUser.email as string,
     passwordResetToken.token
   );
 

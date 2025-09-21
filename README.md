@@ -23,8 +23,8 @@ Follow these steps to get the application running locally.
 
 ```bash
 # Not applicable in this environment, but for local setup:
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/oporoke/authflow.git
+cd authflow
 ```
 
 ### 2. Install dependencies

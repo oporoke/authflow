@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { AuthError } from 'next-auth';
+import { isRedirectError } from 'next/dist/client/components/redirect';
 
 import {
   SignupSchema,
@@ -62,6 +63,9 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
 
     return { success: true, message: 'Signup successful! Redirecting...' };
   } catch (error) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
     console.error('Signup error:', error);
     return { message: 'An unexpected error occurred.' };
   }

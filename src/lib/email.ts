@@ -31,3 +31,16 @@ export const sendWelcomeEmail = async (email: string, username: string) => {
     html: `<p>Hi ${username},</p><p>Welcome to AuthFlow! We're excited to have you on board.</p>`,
   });
 };
+
+export const sendTwoFactorTokenEmail = async (email: string, token: string) => {
+    if (!fromEmail) {
+      console.error("Email 'from' address is not configured.");
+      return;
+    }
+    await resend.emails.send({
+        from: fromEmail,
+        to: email,
+        subject: 'Your 2FA Code',
+        html: `<p>Your 2FA code is: ${token}</p>`
+    })
+}

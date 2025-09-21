@@ -7,6 +7,7 @@ export const LoginSchema = z.object({
   password: z.string().min(1, {
     message: 'Password is required.',
   }),
+  code: z.optional(z.string()),
 });
 
 export const SignupSchema = z.object({
@@ -45,4 +46,8 @@ export const ProfileSchema = z.object({
     email: z.string().email({
         message: 'Please enter a valid email address.',
     }),
+});
+
+export const TwoFactorSchema = z.object({
+  code: z.string().length(6, { message: "Your one-time code must be 6 characters." }),
 });

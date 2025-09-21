@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 
 import { db } from '@/lib/db';
 import { LoginSchema } from '@/lib/validations';
-import { getUserByEmail, updateUser } from '@/lib/data';
+import { getUserByEmail, updateUser, getTwoFactorConfirmationByUserId } from '@/lib/data';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION } from './constants';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -13,6 +13,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: 'jwt' },
   pages: {
     signIn: '/login',
+    error: '/login', // Redirect to login on error
   },
   providers: [
     Credentials({
@@ -56,10 +57,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+        // Allow OAuth without email verification
+        if (account?.provider !== 'credentials') return true;
+
+        if (!user.id) return false;
+
+        const existingUser = await getUserById(user.id);
+        
+        // Prevent sign in without email verification
+        if (!existingUser?.emailVerified) return false;
+        
+        if (existingUser.twoFactorEnabled) {
+            const twoFactorConfirmation = await getTwoFactorConfirmationByUserId(existingUser.id);
+            
+            if (!twoFactorConfirmation) return false;
+            
+            // Delete the 2FA confirmation for the next sign in
+            await db.twoFactorConfirmation.delete({ where: { id: twoFactorConfirmation.id } });
+        }
+
+        return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.username = user.username;
+        token.twoFactorEnabled = user.twoFactorEnabled;
       }
       return token;
     },
@@ -67,6 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.username = token.username as string;
+        session.user.isTwoFactorEnabled = token.twoFactorEnabled as boolean;
       }
       return session;
     },

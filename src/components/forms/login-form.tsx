@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
 
@@ -24,6 +24,7 @@ import { login } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
   const { toast } = useToast();
@@ -41,7 +42,10 @@ export function LoginForm() {
     startTransition(() => {
       login(values, callbackUrl)
         .then((data) => {
-          if (data?.message) {
+          if (data?.twoFactor) {
+            router.push(`/login?twoFactor=true&email=${encodeURIComponent(values.email)}`);
+          }
+          if (data?.message && !data.success) {
             toast({
               title: 'Login Failed',
               description: data.message,

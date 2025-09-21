@@ -3,6 +3,8 @@
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { AuthError } from 'next-auth';
+import { authenticator } from 'otplib';
+import qrcode from 'qrcode';
 
 import {
   SignupSchema,
@@ -10,6 +12,7 @@ import {
   ForgotPasswordSchema,
   ProfileSchema,
   LoginSchema,
+  TwoFactorSchema,
 } from '@/lib/validations';
 import {
   getUserByEmail,
@@ -18,9 +21,16 @@ import {
   deletePasswordResetToken,
   updateUser,
   createUser,
+  getTwoFactorTokenByToken,
+  deleteTwoFactorToken,
+  createTwoFactorToken,
+  getTwoFactorConfirmationByUserId,
+  deleteTwoFactorConfirmation,
+  createTwoFactorConfirmation,
+  getUserById,
 } from '@/lib/data';
 import { signIn } from '@/lib/auth';
-import { sendPasswordResetEmail, sendWelcomeEmail } from '@/lib/email';
+import { sendPasswordResetEmail, sendWelcomeEmail, sendTwoFactorTokenEmail } from '@/lib/email';
 import { DEFAULT_LOGIN_REDIRECT } from '@/lib/constants';
 
 type FormState = {
@@ -70,28 +80,73 @@ export async function signup(values: z.infer<typeof SignupSchema>): Promise<Form
   }
 }
 
-export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: string | null): Promise<FormState> {
-    try {
-        await signIn('credentials', {
-            email: values.email,
-            password: values.password,
-            redirectTo: callbackUrl || DEFAULT_LOGIN_REDIRECT,
-        });
-        return { success: true, message: "Logged in successfully!" }
-    } catch(error) {
-        if (error instanceof AuthError) {
-            switch(error.type) {
-                case 'CredentialsSignin':
-                    return { message: 'Invalid email or password.'}
-                default:
-                    return { message: 'An error occurred.'}
-            }
-        }
-        if ((error as any).digest?.includes('NEXT_REDIRECT')) {
-          throw error;
-        }
-        throw error;
+export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: string | null): Promise<FormState & { twoFactor?: boolean }> {
+  const validatedFields = LoginSchema.safeParse(values);
+
+  if (!validatedFields.success) {
+    return { message: "Invalid fields." };
+  }
+
+  const { email, password, code } = validatedFields.data;
+
+  const existingUser = await getUserByEmail(email);
+
+  if (!existingUser || !existingUser.email || !existingUser.password) {
+    return { message: "Invalid email or password." };
+  }
+
+  if (existingUser.lockedUntil && new Date() < new Date(existingUser.lockedUntil)) {
+    return { message: `Account locked. Try again after ${new Date(existingUser.lockedUntil).toLocaleTimeString()}.` };
+  }
+
+  if (existingUser.twoFactorEnabled && existingUser.email) {
+    if (code) {
+      const twoFactorToken = await getTwoFactorTokenByToken(code);
+      if (!twoFactorToken || twoFactorToken.token !== code) {
+        return { message: 'Invalid 2FA code.' };
+      }
+
+      if (new Date(twoFactorToken.expires) < new Date()) {
+        return { message: '2FA code has expired.' };
+      }
+      
+      await deleteTwoFactorToken(twoFactorToken.id);
+
+      const existingConfirmation = await getTwoFactorConfirmationByUserId(existingUser.id);
+
+      if (existingConfirmation) {
+        await deleteTwoFactorConfirmation(existingConfirmation.userId);
+      }
+      await createTwoFactorConfirmation(existingUser.id);
+
+    } else {
+      const twoFactorToken = await createTwoFactorToken(existingUser.email);
+      await sendTwoFactorTokenEmail(twoFactorToken.email, twoFactorToken.token);
+      return { twoFactor: true, message: "2FA code sent to your email." }
     }
+  }
+
+  try {
+      await signIn('credentials', {
+          email,
+          password,
+          redirectTo: callbackUrl || DEFAULT_LOGIN_REDIRECT,
+      });
+      return { success: true, message: "Logged in successfully!" }
+  } catch(error) {
+      if (error instanceof AuthError) {
+          switch(error.type) {
+              case 'CredentialsSignin':
+                  return { message: 'Invalid email or password.'}
+              default:
+                  return { message: 'An error occurred.'}
+          }
+      }
+      if ((error as any).digest?.includes('NEXT_REDIRECT')) {
+        throw error;
+      }
+      throw error;
+  }
 }
 
 
@@ -165,4 +220,56 @@ export async function updateProfile(userId: string, values: z.infer<typeof Profi
     console.error('Update profile error:', error);
     return { message: 'An unexpected error occurred.' };
   }
+}
+
+export async function generateTwoFactorSecret(userId: string) {
+    const user = await getUserById(userId);
+
+    if (!user || !user.email) {
+      return { error: "User not found." };
+    }
+
+    if (user.twoFactorEnabled) {
+      return { error: "2FA is already enabled."};
+    }
+
+    const secret = authenticator.generateSecret();
+    const otpauth = authenticator.keyuri(user.email, 'AuthFlow', secret);
+
+    await updateUser(user.id, { twoFactorSecret: secret });
+
+    const qrCode = await qrcode.toDataURL(otpauth);
+    
+    return { qrCode, secret };
+}
+
+export async function enableTwoFactor(userId: string, values: z.infer<typeof TwoFactorSchema>) {
+    const user = await getUserById(userId);
+    if (!user || !user.twoFactorSecret) {
+      return { error: "User or 2FA secret not found." };
+    }
+
+    const isValid = authenticator.verify({ token: values.code, secret: user.twoFactorSecret });
+    
+    if (!isValid) {
+      return { error: "Invalid 2FA code." };
+    }
+
+    await updateUser(user.id, { twoFactorEnabled: true });
+    
+    return { success: "2FA enabled successfully." };
+}
+
+export async function disableTwoFactor(userId: string) {
+    const user = await getUserById(userId);
+    if (!user) {
+      return { error: "User not found." };
+    }
+
+    await updateUser(user.id, {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+    });
+    
+    return { success: "2FA disabled successfully." };
 }

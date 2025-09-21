@@ -11,32 +11,25 @@ datasource db {
 }
 
 model User {
-  id                    String                 @id @default(cuid())
-  username              String?                @unique
-  email                 String                 @unique
-  password              String
+  id                    String    @id @default(cuid())
+  username              String?
+  email                 String?   @unique
   emailVerified         DateTime?
   image                 String?
-  failedLoginAttempts   Int                    @default(0)
-  lockedUntil           DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  password              String?
   accounts              Account[]
   sessions              Session[]
-  passwordResetTokens   PasswordResetToken[]
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  failedLoginAttempts   Int       @default(0)
+  lockedUntil           DateTime?
+
+  // 2FA Fields
+  twoFactorEnabled      Boolean   @default(false)
+  twoFactorSecret       String?
+  twoFactorConfirmation TwoFactorConfirmation?
 }
 
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String   @unique
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-}
-
-// NextAuth models
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -70,4 +63,28 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  userId    String
+  used      Boolean  @default(false)
+}
+
+// 2FA Models
+model TwoFactorConfirmation {
+  id      String @id @default(cuid())
+  userId  String @unique
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TwoFactorToken {
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
+  @@unique([email, token])
 }

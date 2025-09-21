@@ -17,7 +17,6 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CardContent, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { updateProfile } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
@@ -63,8 +62,8 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <CardContent className="grid gap-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="grid gap-4">
           <FormField
             control={form.control}
             name="username"
@@ -91,13 +90,11 @@ export function ProfileForm({ user }: ProfileFormProps) {
               </FormItem>
             )}
           />
-        </CardContent>
-        <CardFooter>
+        </div>
           <Button type="submit" disabled={isPending || !form.formState.isDirty}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Changes
           </Button>
-        </CardFooter>
       </form>
     </Form>
   );

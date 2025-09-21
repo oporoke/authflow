@@ -21,6 +21,11 @@ import { useToast } from '@/hooks/use-toast';
 import { login } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
 
+// A simplified schema for this form
+const TwoFactorCodeSchema = z.object({
+  code: z.string().length(6, { message: "Your one-time code must be 6 characters." }),
+});
+
 export function TwoFactorForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl');
@@ -28,26 +33,25 @@ export function TwoFactorForm() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
-  const form = useForm<z.infer<typeof LoginSchema>>({
-    resolver: zodResolver(LoginSchema),
+  const form = useForm<z.infer<typeof TwoFactorCodeSchema>>({
+    resolver: zodResolver(TwoFactorCodeSchema),
     defaultValues: {
-      email: email || '',
-      password: '', // Password is not needed here, but schema requires it
       code: '',
     },
   });
 
-  const onSubmit = (values: z.infer<typeof LoginSchema>) => {
+  const onSubmit = (values: z.infer<typeof TwoFactorCodeSchema>) => {
     startTransition(() => {
         if (!email) {
             toast({ title: 'Error', description: 'Email not found.', variant: 'destructive' });
             return;
         }
-        // We need to pass the password, but it's not used in the 2FA step
-        // A better implementation might separate the logic more cleanly
+
         const loginValues = {
             email,
-            password: 'dummy-password-for-validation', // This won't be checked
+            // Password is not needed for the 2FA check, but the underlying action expects it.
+            // We can pass a dummy value because the action logic will prioritize the 2FA code check.
+            password: 'dummy-password-for-2fa-validation', 
             code: values.code
         }
 

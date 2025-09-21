@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 
 import { db } from '@/lib/db';
 import { LoginSchema } from '@/lib/validations';
-import { getUserByEmail, updateUser, getTwoFactorConfirmationByUserId } from '@/lib/data';
+import { getUserByEmail, updateUser, getTwoFactorConfirmationByUserId, getUserById } from '@/lib/data';
 import { MAX_LOGIN_ATTEMPTS, LOCKOUT_DURATION } from './constants';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

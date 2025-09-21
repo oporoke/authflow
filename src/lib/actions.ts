@@ -110,6 +110,7 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
 
       if (new Date(twoFactorToken.expires) < new Date()) {
         await createTwoFactorToken(existingUser.email);
+        await sendTwoFactorTokenEmail(existingUser.email, (await getTwoFactorTokenByEmail(existingUser.email))!.token);
         return { message: '2FA code has expired. A new one has been sent.' };
       }
       
@@ -122,6 +123,9 @@ export async function login(values: z.infer<typeof LoginSchema>, callbackUrl?: s
       }
       await createTwoFactorConfirmation(existingUser.id);
     } else {
+        if (!password) {
+            return { message: "Password is required." };
+        }
         const passwordsMatch = await bcrypt.compare(password, existingUser.password);
         if (!passwordsMatch) {
             return { message: "Invalid email or password." };
